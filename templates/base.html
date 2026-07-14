@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}{{ NOME_CLINICA }} - Financeiro{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+  <script>
+    // Aplica o tema salvo ANTES da primeira pintura, evitando o "flash" claro.
+    if (localStorage.getItem("tema") === "dark") document.body.classList.add("dark-mode");
+    // Idem para o Modo Focus (vale para todas as telas).
+    if (localStorage.getItem("modo_focus") === "ativo") document.body.classList.add("modo-focus-ativo");
+  </script>
+  <div class="app-layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-icon">🦷</div>
+        <div class="sidebar-brand-text">
+          {{ NOME_CLINICA }}
+          <small>Financeiro</small>
+        </div>
+      </div>
+      <ul class="sidebar-nav">
+        <li>
+          <a href="{{ url_for('dashboard') }}" class="sidebar-link {{ 'active' if active_page == 'dashboard' else '' }}">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="12" width="4" height="9"></rect><rect x="10" y="7" width="4" height="14"></rect><rect x="17" y="3" width="4" height="18"></rect></svg>
+            Painel Principal
+          </a>
+        </li>
+        <li>
+          <a href="{{ url_for('pacientes') }}" class="sidebar-link {{ 'active' if active_page == 'pacientes' else '' }}">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21v-1a7 7 0 0 1 14 0v1"></path></svg>
+            Pacientes
+          </a>
+        </li>
+        <li>
+          <a href="{{ url_for('contas') }}" class="sidebar-link {{ 'active' if active_page == 'contas' else '' }}">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"></rect><path d="M9 3h6a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1z"></path><path d="M9 11h6M9 15h6M9 19h3"></path></svg>
+            Gestão de Contas
+          </a>
+        </li>
+        <li>
+          <a href="{{ url_for('cartao') }}" class="sidebar-link {{ 'active' if active_page == 'cartao' else '' }}">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="15" rx="2.5"></rect><path d="M2 10h20"></path><path d="M6 15h4"></path></svg>
+            Cartão de Crédito
+          </a>
+        </li>
+        <li>
+          <a href="{{ url_for('boletos') }}" class="sidebar-link {{ 'active' if active_page == 'boletos' else '' }}">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5v14"></path><path d="M7 5v14"></path><path d="M11 5v14"></path><path d="M15 5v9"></path><path d="M19 5v9"></path><path d="M15 18h6"></path></svg>
+            Cobrança de Boletos
+          </a>
+        </li>
+        <li>
+          <a href="{{ url_for('cadastros') }}" class="sidebar-link {{ 'active' if active_page == 'cadastros' else '' }}">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.6 2.9 21 11.3a2 2 0 0 1 0 2.8l-6.9 6.9a2 2 0 0 1-2.8 0L2.9 12.6A2 2 0 0 1 2.3 11l.6-6a2 2 0 0 1 1.8-1.8l6-.6a2 2 0 0 1 1.9.3Z"></path><circle cx="8" cy="8" r="1.5"></circle></svg>
+            Cadastros
+          </a>
+        </li>
+        <li>
+          <a href="{{ url_for('relatorios') }}" class="sidebar-link {{ 'active' if active_page == 'relatorios' else '' }}">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"></path><path d="M22 2 15 22l-4-9-9-4 20-7Z"></path></svg>
+            Central de Relatórios
+          </a>
+        </li>
+        <li>
+          <a href="{{ url_for('oraculo') }}" class="sidebar-link {{ 'active' if active_page == 'oraculo' else '' }}">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"></path><path d="M18.5 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8z"></path></svg>
+            Oráculo Financeiro
+          </a>
+        </li>
+      </ul>
+      <div class="sidebar-footer">
+        Rodando 100% local · SQLite
+      </div>
+    </aside>
+
+    <!-- Conteúdo principal -->
+    <div class="main">
+      <header class="topbar">
+        <div class="topbar-title">
+          <h1>{% block page_title %}{% endblock %}</h1>
+          <p>{% block page_subtitle %}{% endblock %}</p>
+        </div>
+
+        <!-- Barra de Pesquisa Global de Pacientes (visível em todas as telas) -->
+        <div class="pesquisa-global" data-pesquisa-global>
+          <svg class="pesquisa-lupa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+          <input type="search" data-pesquisa-input placeholder="Buscar paciente por nome ou CPF…"
+                 autocomplete="off" spellcheck="false" aria-label="Buscar paciente" />
+          <div class="pesquisa-resultados" data-pesquisa-resultados></div>
+        </div>
+
+        <div class="topbar-right">
+          <div class="topbar-date" data-topbar-date>--</div>
+          <button type="button" class="tema-toggle" data-focus-toggle
+                  title="Ativar Modo Focus: esconde os menus para focar nos dados (tecla F)"
+                  aria-label="Ativar Modo Focus">🧘</button>
+          <button type="button" class="tema-toggle" data-tema-toggle
+                  title="Alternar entre tema claro e escuro" aria-label="Alternar tema">🌙</button>
+        </div>
+      </header>
+
+      <!-- Botão flutuante para sair do Modo Focus (a topbar fica escondida no modo) -->
+      <button type="button" class="focus-sair" data-focus-toggle
+              title="Também dá para sair com a tecla F ou Esc">🧘 Sair do Modo Focus</button>
+
+      <main class="content">
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

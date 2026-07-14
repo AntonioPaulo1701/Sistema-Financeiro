@@ -1,0 +1,4 @@
+Flask==3.0.3
+pywhatkit==5.4
+pdfplumber==0.11.4
+anthropic==0.116.0

@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+
+{% block title %}Cartão de Crédito - {{ NOME_CLINICA }}{% endblock %}
+{% block page_title %}Cartão de Crédito{% endblock %}
+{% block page_subtitle %}Lance as compras do cartão e concilie automaticamente com o PDF da fatura{% endblock %}
+
+{% block content %}
+
+  {% if erro %}
+  <div class="form-error">{{ erro }}</div>
+  {% endif %}
+
+  <!-- Cadastro de lançamento direto na aba do cartão -->
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>Novo Lançamento no Cartão</h2>
+        <p>A conta entra automaticamente na fatura do mês/ano do vencimento</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <form method="post" action="{{ url_for('nova_conta') }}">
+        <input type="hidden" name="forma_pagamento" value="cartao" />
+        <input type="hidden" name="origem" value="cartao" />
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="cartao-nome">Descrição da Compra</label>
+            <input type="text" id="cartao-nome" name="nome" placeholder="Ex: Material de escritório" required />
+          </div>
+          <div class="form-field">
+            <label for="cartao-valor">Valor Total (R$)</label>
+            <input type="number" id="cartao-valor" name="valor" step="0.01" min="0.01" placeholder="0,00" required />
+          </div>
+          <div class="form-field">
+            <label for="cartao-parcelas">Parcelamento</label>
+            <select id="cartao-parcelas" name="parcelas">
+              <option value="1" selected>À vista (1x)</option>
+              {% for n in range(2, 25) %}
+              <option value="{{ n }}">{{ n }}x</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="cartao-recorrencia">Recorrência</label>
+            <select id="cartao-recorrencia" name="recorrencia">
+              <option value="1" selected>Não repete</option>
+              {% for n in range(2, 25) %}
+              <option value="{{ n }}">Por {{ n }} meses</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="cartao-vencimento">Vencimento da Fatura</label>
+            <input type="date" id="cartao-vencimento" name="vencimento" required />
+          </div>
+          <div class="form-field">
+            <label for="cartao-categoria">Categoria</label>
+            <select id="cartao-categoria" name="categoria">
+              {% for c in categorias %}
+              <option value="{{ c.nome }}">{{ c.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="cartao-fornecedor">Fornecedor (opcional)</label>
+            <select id="cartao-fornecedor" name="fornecedor_id">
+              <option value="">— Sem fornecedor —</option>
+              {% for f in fornecedores %}
+              <option value="{{ f.id }}">{{ f.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="cartao-cartao">Cartão</label>
+            <select id="cartao-cartao" name="cartao_id">
+              <option value="">— Não informar —</option>
+              {% for cartao in cartoes %}
+              <option value="{{ cartao.id }}">💳 {{ cartao.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="cartao-conta-bancaria">Conta de Pagamento</label>
+            <select id="cartao-conta-bancaria" name="conta_bancaria_id">
+              <option value="">— Não informar —</option>
+              {% for cb in contas_bancarias %}
+              <option value="{{ cb.id }}">{{ cb.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <p class="form-hint">
+          Parcelando, informe o valor total da compra: cada parcela cai automaticamente na fatura do
+          seu mês (ex: 10x a partir de julho lança uma parcela por fatura até abril). Para assinaturas
+          (ex: Netflix, software), use a <strong>recorrência</strong>: o valor cheio se repete na fatura
+          de cada mês. Use parcelamento ou recorrência, não os dois.
+        </p>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Lançar no Cartão</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- Importação da fatura em OFX -->
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>Importar Fatura OFX</h2>
+        <p>Escolha o cartão, envie o arquivo .ofx exportado no app do banco e lance as compras em um clique</p>
+      </div>
+      {% if cartoes %}
+      <form method="post" action="{{ url_for('importar_fatura_ofx') }}" enctype="multipart/form-data" class="extrato-form">
+        <select name="cartao_id" class="select-compacto" required>
+          <option value="" disabled {{ 'selected' if not cartao_ofx }}>Qual cartão?</option>
+          {% for cartao in cartoes %}
+          <option value="{{ cartao.id }}" {{ 'selected' if cartao_ofx and cartao_ofx.id == cartao.id }}>💳 {{ cartao.nome }}</option>
+          {% endfor %}
+        </select>
+        <input type="file" name="fatura_ofx" accept=".ofx" required />
+        <button type="submit" class="btn btn-primary">Ler Fatura</button>
+      </form>
+      {% else %}
+      <a href="{{ url_for('cadastros', aba='cartoes') }}" class="btn btn-secondary">Cadastrar um cartão primeiro</a>
+      {% endif %}
+    </div>
+    {% if transacoes_ofx %}
+    <div class="panel-body" style="padding: 0;">
+      {% set importadas = transacoes_ofx | selectattr('importada') | list | length %}
+      <div class="extrato-resumo">
+        <strong>Compras Encontradas — 💳 {{ cartao_ofx.nome }}:</strong>
+        {{ transacoes_ofx | length }} compra(s) na fatura ·
+        {{ importadas }} já lançada(s) · {{ transacoes_ofx | length - importadas }} aguardando confirmação
+        <a href="{{ url_for('cartao') }}" class="btn btn-secondary btn-sm">Concluir importação</a>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Data da Compra</th>
+              <th>Descrição do Banco</th>
+              <th>Valor</th>
+              <th>Categoria</th>
+              <th>Confirmação</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in transacoes_ofx %}
+            <tr>
+              <td>{{ t.data_br }}</td>
+              <td class="cell-strong">{{ t.descricao }}</td>
+              <td>R$ {{ t.valor | brl }}</td>
+              {% if t.importada %}
+              <td class="text-muted">—</td>
+              <td><span class="status-badge pago"><span class="dot"></span>Lançada</span></td>
+              {% else %}
+              <td>
+                <select name="categoria" class="select-compacto" form="fatura-ofx-{{ loop.index }}">
+                  {% for c in categorias %}
+                  <option value="{{ c.nome }}">{{ c.nome }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td>
+                <button type="submit" class="btn btn-primary btn-sm" form="fatura-ofx-{{ loop.index }}">
+                  Lançar na Fatura
+                </button>
+              </td>
+              {% endif %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <!-- Formulários das compras (fora da tabela; ligados pelos atributos form="") -->
+      {% for t in transacoes_ofx %}
+      {% if not t.importada %}
+      <form id="fatura-ofx-{{ loop.index }}" method="post" action="{{ url_for('lancar_compra_fatura_ofx') }}">
+        <input type="hidden" name="token" value="{{ fatura_ofx_token }}" />
+        <input type="hidden" name="cartao_id" value="{{ cartao_ofx.id }}" />
+        <input type="hidden" name="data" value="{{ t.data }}" />
+        <input type="hidden" name="descricao" value="{{ t.descricao }}" />
+        <input type="hidden" name="valor" value="{{ t.valor }}" />
+      </form>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
+
+  {% if cartoes %}
+  <!-- Filtro das faturas por cartão -->
+  <form method="get" action="{{ url_for('cartao') }}" class="extrato-form" style="margin-bottom: 18px;">
+    <label for="filtro-cartao" class="text-muted" style="font-size: 13px; font-weight: 600;">Ver faturas de</label>
+    <select id="filtro-cartao" name="filtro_cartao" class="select-compacto" onchange="this.form.submit()">
+      <option value="">Todos os cartões</option>
+      {% for cartao in cartoes %}
+      <option value="{{ cartao.id }}" {{ 'selected' if filtro_cartao == cartao.id | string }}>💳 {{ cartao.nome }}</option>
+      {% endfor %}
+    </select>
+    {% if filtro_cartao %}
+    <span class="text-muted" style="font-size: 12.5px;">
+      Mostrando só os lançamentos deste cartão (totais do PDF ficam na visão "Todos")
+    </span>
+    {% endif %}
+  </form>
+  {% endif %}
+
+  {% if faturas %}
+  <div class="fatura-grid">
+    {% for fatura in faturas %}
+    <article class="fatura-card">
+      <div class="fatura-card-header">
+        <div>
+          <h3>{{ fatura.label }}</h3>
+          <span class="fatura-status {{ fatura.status }}">
+            {% if fatura.status == 'conciliada' %}Conciliada
+            {% elif fatura.status == 'divergente' %}Divergente
+            {% else %}Aguardando fatura
+            {% endif %}
+          </span>
+        </div>
+        <span class="fatura-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="15" rx="2.5"></rect><path d="M2 10h20"></path><path d="M6 15h4"></path></svg>
+        </span>
+      </div>
+
+      <div class="fatura-totais">
+        <div class="fatura-total-item">
+          <span class="text-muted">Lançado no sistema ({{ fatura.qtd }} conta{{ 's' if fatura.qtd != 1 else '' }})</span>
+          <strong>R$ {{ fatura.valor_lancado | brl }}</strong>
+        </div>
+        {% if fatura.valor_informado is not none %}
+        <div class="fatura-total-item">
+          <span class="text-muted">
+            {% if fatura.total_detectado is not none %}Total lido do PDF automaticamente
+            {% else %}Total informado manualmente
+            {% endif %}
+          </span>
+          <strong>R$ {{ fatura.valor_informado | brl }}</strong>
+        </div>
+        <div class="fatura-diferenca {{ 'ok' if fatura.status == 'conciliada' else 'alerta' }}">
+          {% if fatura.status == 'conciliada' %}
+          Os valores batem certinho!
+          {% else %}
+          Diferença de R$ {{ fatura.diferenca | abs | brl }}
+          {{ 'a mais no sistema' if fatura.diferenca < 0 else 'faltando lançar' }}
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      {% if fatura.encontradas or fatura.nao_encontradas %}
+      <div class="fatura-conciliacao-resumo {{ 'ok' if fatura.nao_encontradas == 0 else 'alerta' }}">
+        {% if fatura.nao_encontradas == 0 %}
+        ✓ Todas as {{ fatura.encontradas }} conta(s) foram encontradas na fatura
+        {% else %}
+        {{ fatura.encontradas }} de {{ fatura.qtd }} conta(s) encontradas na fatura —
+        confira as marcadas com ✕
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <!-- Área retrátil de auditoria: todos os gastos vinculados a esta fatura -->
+      <details class="fatura-lancamentos" {{ 'open' if fatura.nao_encontradas else '' }}>
+        <summary>
+          <span class="fatura-lancamentos-seta">▸</span>
+          Auditar gastos desta fatura ({{ fatura.qtd }})
+        </summary>
+        {% if fatura.contas %}
+        <div class="auditoria-wrapper">
+          <table class="auditoria-tabela">
+            <thead>
+              <tr>
+                <th>Conta</th>
+                <th>Categoria</th>
+                <th class="auditoria-valor">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in fatura.contas %}
+              <tr>
+                <td>
+                  <span class="fatura-conta-nome">
+                    {% if c.conciliacao == 'encontrada' %}
+                    <span class="conciliacao-marca ok" title="Valor encontrado no PDF da fatura">✓</span>
+                    {% elif c.conciliacao == 'nao_encontrada' %}
+                    <span class="conciliacao-marca falta" title="Valor NÃO encontrado no PDF da fatura">✕</span>
+                    {% endif %}
+                    <span>
+                      {{ c.nome }}
+                      {% if c.fornecedor %}<small class="conta-fornecedor">{{ c.fornecedor }}</small>{% endif %}
+                      {% if c.cartao %}<small class="conta-fornecedor">💳 {{ c.cartao }}</small>{% endif %}
+                    </span>
+                  </span>
+                </td>
+                <td class="text-muted">{{ c.categoria }}</td>
+                <td class="auditoria-valor">R$ {{ c.valor | brl }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="2">Total lançado</td>
+                <td class="auditoria-valor">R$ {{ fatura.valor_lancado | brl }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted" style="font-size: 13px; margin: 10px 0 0;">Nenhuma conta lançada ainda.</p>
+        {% endif %}
+      </details>
+
+      <form
+        method="post"
+        action="{{ url_for('conciliar_fatura', referencia=fatura.referencia) }}"
+        enctype="multipart/form-data"
+        class="fatura-form"
+      >
+        <div class="form-field">
+          <label for="pdf-{{ fatura.referencia }}">
+            {{ 'Enviar novo PDF da fatura' if fatura.arquivo_pdf else 'Enviar PDF da fatura do banco' }}
+          </label>
+          <input type="file" id="pdf-{{ fatura.referencia }}" name="pdf" accept="application/pdf" {{ '' if fatura.arquivo_pdf else 'required' }} />
+          <span class="form-hint mt-0">O sistema lê o PDF, encontra o total e confere conta por conta pelo valor.</span>
+        </div>
+        <details class="fatura-valor-manual">
+          <summary>Informar o valor total manualmente (opcional)</summary>
+          <div class="form-field" style="margin-top: 10px;">
+            <label for="valor-{{ fatura.referencia }}">Valor total da fatura (R$)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              id="valor-{{ fatura.referencia }}"
+              name="valor_informado"
+              placeholder="Só preencha se o sistema não achar o total no PDF"
+            />
+          </div>
+        </details>
+        <div class="fatura-form-actions">
+          <button type="submit" class="btn btn-primary">Conciliar Automaticamente</button>
+          {% if fatura.arquivo_pdf %}
+          <a href="{{ url_for('baixar_fatura_pdf', referencia=fatura.referencia) }}" class="btn btn-secondary" target="_blank" rel="noopener" title="Abre o PDF original da fatura em uma nova aba">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            Visualizar Fatura
+          </a>
+          {% endif %}
+        </div>
+      </form>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    {% if filtro_cartao %}
+    Nenhum lançamento deste cartão ainda. Importe a fatura OFX dele ou selecione "Todos os cartões".
+    {% else %}
+    Nenhuma fatura ainda. Lance a primeira compra do cartão no formulário acima —
+    a fatura do mês é criada automaticamente.
+    {% endif %}
+  </div>
+  {% endif %}
+
+{% endblock %}

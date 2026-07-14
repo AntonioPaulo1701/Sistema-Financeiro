@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+
+{% block title %}Oráculo Financeiro - {{ NOME_CLINICA }}{% endblock %}
+{% block page_title %}Oráculo Financeiro{% endblock %}
+{% block page_subtitle %}Simule um gasto novo e veja o impacto no caixa antes de decidir{% endblock %}
+
+{% block content %}
+
+  <!-- Formulário da simulação -->
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>Simular Cenário</h2>
+        <p>Preencha o gasto que você está pensando em assumir</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      {% if erro %}
+      <div class="form-error">{{ erro }}</div>
+      {% endif %}
+      <form method="post" action="{{ url_for('simular_oraculo') }}">
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="valor_mensal">Valor mensal</label>
+            <input type="number" id="valor_mensal" name="valor_mensal" step="0.01" min="0.01"
+                   placeholder="0,00" value="{{ form.valor_mensal or '' }}" required />
+          </div>
+          <div class="form-field">
+            <label for="categoria">Categoria</label>
+            <select id="categoria" name="categoria" required>
+              <option value="" disabled {{ 'selected' if not form.categoria }}>Escolha...</option>
+              {% for nome in categorias %}
+              <option value="{{ nome }}" {{ 'selected' if form.categoria == nome }}>{{ nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="duracao_meses">Duração</label>
+            <input type="number" id="duracao_meses" name="duracao_meses" min="1" max="60" step="1"
+                   placeholder="Ex: 12" value="{{ form.duracao_meses or '' }}" required />
+          </div>
+        </div>
+        <p class="form-hint">
+          Informe o valor da parcela em reais, a categoria do gasto e por quantos meses ele vai
+          durar. A simulação não grava nada no banco — é um ensaio por cima dos dados reais de
+          contas a pagar e boletos a receber dos próximos 6 meses.
+        </p>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Consultar o Oráculo</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  {% if simulacao %}
+  <!-- Veredito da simulação -->
+  <section class="oraculo-veredito {{ simulacao.resumo.nivel }}">
+    <span class="oraculo-veredito-icone">{{ '✅' if simulacao.resumo.nivel == 'seguro' else '🚨' }}</span>
+    <div>
+      <strong>
+        {% if simulacao.resumo.nivel == 'seguro' %}É seguro investir{% else %}O caixa fica no vermelho{% endif %}
+      </strong>
+      <p>{{ simulacao.resumo.frase }}</p>
+      <p class="oraculo-veredito-fatos">
+        Cenário: R$ {{ simulacao.parametros.valor_mensal | brl }}/mês em
+        {{ simulacao.parametros.categoria }} por {{ simulacao.parametros.duracao_meses }} mês(es)
+        · Custo total: R$ {{ simulacao.parametros.custo_total | brl }}
+        · Pior mês projetado: {{ simulacao.resumo.pior_mes_label }}
+        (R$ {{ simulacao.resumo.pior_mes_saldo | brl }})
+      </p>
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- Gráfico da projeção -->
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>Fluxo de Caixa — próximos 6 meses</h2>
+        <p>
+          {% if simulacao %}
+          Saldo previsto de cada mês: situação atual × com o gasto simulado
+          {% else %}
+          Saldo previsto de cada mês (boletos a receber − contas a pagar). Simule um cenário acima
+          para comparar.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="chart-box" style="height: 320px;"><canvas id="grafico-oraculo"></canvas></div>
+      <details class="oraculo-tabela">
+        <summary>Ver os números da projeção</summary>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Mês</th>
+                <th>A receber</th>
+                <th>A pagar</th>
+                <th>Saldo previsto</th>
+                {% if simulacao %}<th>Saldo com o cenário</th>{% endif %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for mes in (simulacao.projecao if simulacao else projecao) %}
+              <tr>
+                <td class="cell-strong">{{ mes.label }}</td>
+                <td>R$ {{ mes.receitas | brl }}</td>
+                <td>R$ {{ mes.despesas | brl }}</td>
+                <td>R$ {{ mes.saldo | brl }}</td>
+                {% if simulacao %}<td>R$ {{ mes.saldo_simulado | brl }}</td>{% endif %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+  </section>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+<script>
+  const PROJECAO = {{ (simulacao.projecao if simulacao else projecao) | tojson }};
+  const TEM_SIMULACAO = {{ 'true' if simulacao else 'false' }};
+
+  const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+
+  // Cores lidas das variáveis CSS do tema ativo — o gráfico se repinta ao
+  // alternar claro/escuro (evento "temaAlterado" do main.js).
+  function coresTema() {
+    const css = getComputedStyle(document.body);
+    const v = nome => css.getPropertyValue(nome).trim();
+    const escuro = document.body.classList.contains("dark-mode");
+    return {
+      real: v("--brand-teal"),
+      simulado: escuro ? "#ff3b5c" : "#ec4899", // no escuro o cenário usa o vermelho neon
+      grade: v("--chart-grid"),
+      linhaZero: escuro ? "rgba(255, 59, 92, 0.55)" : "#8a7fa8",
+      texto: v("--color-text-secondary"),
+      superficie: v("--color-surface"),
+    };
+  }
+
+  let graficoOraculo = null;
+
+  function montarGrafico() {
+    if (graficoOraculo) graficoOraculo.destroy();
+    const CORES = coresTema();
+    Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+    Chart.defaults.color = CORES.texto;
+
+    const datasets = [{
+      label: "Fluxo de Caixa Real Atual",
+      data: PROJECAO.map(m => m.saldo),
+      borderColor: CORES.real,
+      backgroundColor: CORES.real,
+      borderWidth: 2,
+      pointStyle: "circle",
+      pointRadius: 4,
+      pointBorderColor: CORES.superficie,
+      pointBorderWidth: 1.5,
+      tension: 0.25,
+    }];
+
+    if (TEM_SIMULACAO) {
+      // Tracejado + losango: o cenário se distingue da linha real mesmo sem cor.
+      datasets.push({
+        label: "Com o Cenário Simulado",
+        data: PROJECAO.map(m => m.saldo_simulado),
+        borderColor: CORES.simulado,
+        backgroundColor: CORES.simulado,
+        borderWidth: 2,
+        borderDash: [7, 4],
+        pointStyle: "rectRot",
+        pointRadius: 5,
+        pointBorderColor: CORES.superficie,
+        pointBorderWidth: 1.5,
+        tension: 0.25,
+      });
+    }
+
+    graficoOraculo = new Chart(document.getElementById("grafico-oraculo"), {
+      type: "line",
+      data: { labels: PROJECAO.map(m => m.label), datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: {
+            display: TEM_SIMULACAO,
+            position: "bottom",
+            labels: { usePointStyle: true, padding: 16 },
+          },
+          tooltip: {
+            callbacks: { label: ctx => ` ${ctx.dataset.label}: ${BRL.format(ctx.parsed.y)}` },
+          },
+        },
+        scales: {
+          x: { grid: { display: false }, border: { display: false } },
+          y: {
+            grid: {
+              // A linha do zero fica mais forte: abaixo dela o caixa está no vermelho.
+              color: ctx => (ctx.tick.value === 0 ? CORES.linhaZero : CORES.grade),
+              lineWidth: ctx => (ctx.tick.value === 0 ? 1.5 : 1),
+            },
+            border: { display: false },
+            ticks: {
+              callback: v => Math.abs(v) >= 1000
+                ? "R$ " + (v / 1000).toLocaleString("pt-BR") + " mil"
+                : BRL.format(v),
+            },
+          },
+        },
+      },
+    });
+  }
+
+  if (typeof Chart !== "undefined") {
+    montarGrafico();
+    document.addEventListener("temaAlterado", montarGrafico);
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Painel Principal - {{ NOME_CLINICA }}{% endblock %}
+{% block page_title %}Painel Principal{% endblock %}
+{% block page_subtitle %}Visão geral das contas a pagar{% endblock %}
+
+{% block content %}
+
+  <!-- Radar de Gargalos Financeiros: categorias gastando acelerado no mês -->
+  {% if gargalos %}
+  <section class="radar-gargalos">
+    {% for alerta in gargalos %}
+    <div class="radar-alerta">
+      <span class="radar-alerta-icone">📡</span>
+      <div>
+        <strong>Radar de Gargalos: {{ alerta.categoria }} está gastando acelerado</strong>
+        <p>
+          Nos primeiros {{ alerta.checkpoint }} dias do mês já foram
+          <strong>R$ {{ alerta.gasto_atual | brl }}</strong> — {{ alerta.percentual_acima }}%
+          acima do ritmo normal (média de R$ {{ alerta.media_historica | brl }} no mesmo trecho
+          dos últimos {{ alerta.meses_no_historico }} meses). São
+          R$ {{ alerta.excesso | brl }} a mais: vale conferir a
+          <a href="{{ url_for('contas') }}">Gestão de Contas</a> antes de o mês fechar.
+        </p>
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <!-- Cards de métricas -->
+  <section class="stat-grid">
+
+    <article class="stat-tile tone-warning">
+      <div class="stat-tile-top">
+        <span class="stat-label">A Pagar Hoje</span>
+        <span class="stat-icon-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>
+        </span>
+      </div>
+      <div class="stat-value">R$ {{ metricas.a_pagar_hoje.valor | brl }}</div>
+      <div class="stat-sub">{{ metricas.a_pagar_hoje.sub }}</div>
+    </article>
+
+    <article class="stat-tile tone-success">
+      <div class="stat-tile-top">
+        <span class="stat-label">Pago no Mês</span>
+        <span class="stat-icon-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="m8.5 12.5 2.5 2.5 5-5"></path></svg>
+        </span>
+      </div>
+      <div class="stat-value">R$ {{ metricas.pago_mes.valor | brl }}</div>
+      <div class="stat-sub">{{ metricas.pago_mes.sub }}</div>
+    </article>
+
+    <article class="stat-tile tone-danger">
+      <div class="stat-tile-top">
+        <span class="stat-label">Vencidos</span>
+        <span class="stat-icon-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 2.6 18a1.8 1.8 0 0 0 1.6 2.6h15.6a1.8 1.8 0 0 0 1.6-2.6L13.7 3.9a1.8 1.8 0 0 0-3.4 0Z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>
+        </span>
+      </div>
+      <div class="stat-value">R$ {{ metricas.vencidos.valor | brl }}</div>
+      <div class="stat-sub">{{ metricas.vencidos.sub }}</div>
+    </article>
+
+  </section>
+
+  <div class="dashboard-split">
+
+    <!-- Tabela resumo -->
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Próximos Vencimentos</h2>
+          <p>Contas cadastradas, ordenadas por data</p>
+        </div>
+        <a href="{{ url_for('contas') }}" class="btn btn-secondary">Ver todas</a>
+      </div>
+      <div class="panel-body" style="padding: 0;">
+        {% if contas %}
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Conta</th>
+                <th>Categoria</th>
+                <th>Vencimento</th>
+                <th>Valor</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for conta in contas %}
+              <tr>
+                <td class="cell-strong">{{ conta.nome }}</td>
+                <td class="text-muted">{{ conta.categoria }}</td>
+                <td>{{ conta.vencimento }}</td>
+                <td>R$ {{ conta.valor | brl }}</td>
+                <td>
+                  <span class="status-badge {{ conta.status }}">
+                    <span class="dot"></span>{{ conta.status | capitalize }}
+                  </span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="empty-state">Nenhuma conta cadastrada ainda. Vá em "Gestão de Contas" para adicionar a primeira.</div>
+        {% endif %}
+      </div>
+    </section>
+
+    <!-- Distribuição por categoria -->
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Por Categoria</h2>
+          <p>Contas em aberto no mês</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        {% if categorias %}
+        <ul class="meter-list">
+          {% for categoria in categorias %}
+          <li class="meter-row">
+            <div class="meter-row-header">
+              <span>{{ categoria.nome }}</span>
+              <span class="cell-strong">R$ {{ categoria.valor | brl }}</span>
+            </div>
+            <div class="meter-track">
+              <div class="meter-fill" style="width: {{ categoria.percentual }}%;"></div>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="empty-state">Sem contas em aberto para exibir por categoria.</div>
+        {% endif %}
+      </div>
+    </section>
+
+  </div>
+
+{% endblock %}

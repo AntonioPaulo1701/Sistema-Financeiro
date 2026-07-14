@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+
+{% block title %}Gestão de Contas - {{ NOME_CLINICA }}{% endblock %}
+{% block page_title %}Gestão de Contas{% endblock %}
+{% block page_subtitle %}Cadastre e acompanhe suas contas a pagar{% endblock %}
+
+{% block content %}
+
+  <!-- Formulário de cadastro -->
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>Nova Conta</h2>
+        <p>Preencha os dados para cadastrar uma conta a pagar</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      {% if erro %}
+      <div class="form-error">{{ erro }}</div>
+      {% endif %}
+      <form method="post" action="{{ url_for('nova_conta') }}">
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="nome">Nome da Conta</label>
+            <input type="text" id="nome" name="nome" placeholder="Ex: Energia Elétrica" required />
+          </div>
+          <div class="form-field">
+            <label for="valor">Valor Total (R$)</label>
+            <input type="number" id="valor" name="valor" step="0.01" min="0.01" placeholder="0,00" required />
+          </div>
+          <div class="form-field">
+            <label for="parcelas">Parcelamento</label>
+            <select id="parcelas" name="parcelas">
+              <option value="1" selected>À vista (1x)</option>
+              {% for n in range(2, 25) %}
+              <option value="{{ n }}">{{ n }}x</option>
+              {% endfor %}
+              <option value="36">36x</option>
+              <option value="48">48x</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="recorrencia">Recorrência</label>
+            <select id="recorrencia" name="recorrencia">
+              <option value="1" selected>Não repete</option>
+              {% for n in range(2, 25) %}
+              <option value="{{ n }}">Por {{ n }} meses</option>
+              {% endfor %}
+              <option value="36">Por 36 meses</option>
+              <option value="48">Por 48 meses</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="vencimento">Vencimento (1ª parcela)</label>
+            <input type="date" id="vencimento" name="vencimento" required />
+          </div>
+          <div class="form-field">
+            <label for="categoria">Categoria</label>
+            <select id="categoria" name="categoria">
+              {% for c in categorias %}
+              <option value="{{ c.nome }}">{{ c.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="fornecedor_id">Fornecedor (opcional)</label>
+            <select id="fornecedor_id" name="fornecedor_id">
+              <option value="">— Sem fornecedor —</option>
+              {% for f in fornecedores %}
+              <option value="{{ f.id }}">{{ f.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="forma_pagamento">Forma de Pagamento</label>
+            <select id="forma_pagamento" name="forma_pagamento">
+              <option value="outro">Boleto/Pix</option>
+              <option value="cartao">Cartão de Crédito</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="conta_bancaria_id">Conta de Pagamento</label>
+            <select id="conta_bancaria_id" name="conta_bancaria_id">
+              <option value="">— Não informar —</option>
+              {% for cb in contas_bancarias %}
+              <option value="{{ cb.id }}">{{ cb.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <p class="form-hint">
+          Parcelando, informe o <strong>valor total da compra</strong>: o sistema divide e lança uma conta
+          por mês automaticamente (ex: R$ 10.000 em 10x vira 10 contas de R$ 1.000, uma a cada mês, já
+          aparecendo nos relatórios). Já na <strong>recorrência</strong>, o valor cheio se repete todo mês
+          (ex: aluguel de R$ 2.000 por 12 meses vira 12 contas de R$ 2.000, nomeadas com o mês/ano).
+          Use um ou outro, não os dois. Marcando "Cartão de Crédito", cada lançamento entra na fatura do seu mês.
+          Faltou uma categoria ou fornecedor? Cadastre na aba <a href="{{ url_for('cadastros') }}">Cadastros</a>.
+        </p>
+        <div class="form-actions">
+          <button type="reset" class="btn btn-secondary">Limpar</button>
+          <button type="submit" class="btn btn-primary">Cadastrar Conta</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- Importação de extrato bancário -->
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>Importar Extrato Bancário</h2>
+        <p>Envie o extrato em .ofx ou .csv e cadastre as despesas em um clique, sem digitar</p>
+      </div>
+      <form method="post" action="{{ url_for('importar_extrato') }}" enctype="multipart/form-data" class="extrato-form">
+        <input type="file" name="extrato" accept=".ofx,.csv" required />
+        <button type="submit" class="btn btn-primary">Ler Extrato</button>
+      </form>
+    </div>
+    {% if transacoes %}
+    <div class="panel-body" style="padding: 0;">
+      {% set importadas = transacoes | selectattr('importada') | list | length %}
+      <div class="extrato-resumo">
+        <strong>Transações Encontradas:</strong> {{ transacoes | length }} saída(s) no extrato ·
+        {{ importadas }} já no sistema · {{ transacoes | length - importadas }} aguardando confirmação
+        <a href="{{ url_for('contas') }}" class="btn btn-secondary btn-sm">Concluir importação</a>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Descrição do Banco</th>
+              <th>Valor</th>
+              <th>Categoria</th>
+              <th>Confirmação</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in transacoes %}
+            <tr>
+              <td>{{ t.data_br }}</td>
+              <td class="cell-strong">{{ t.descricao }}</td>
+              <td>R$ {{ t.valor | brl }}</td>
+              {% if t.importada %}
+              <td class="text-muted">—</td>
+              <td><span class="status-badge pago"><span class="dot"></span>Importada</span></td>
+              {% else %}
+              <td>
+                <select name="categoria" class="select-compacto" form="extrato-tx-{{ loop.index }}">
+                  {% for c in categorias %}
+                  <option value="{{ c.nome }}">{{ c.nome }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td>
+                <button type="submit" class="btn btn-primary btn-sm" form="extrato-tx-{{ loop.index }}">
+                  Salvar no Sistema
+                </button>
+              </td>
+              {% endif %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <!-- Formulários das transações (fora da tabela; ligados pelos atributos form="") -->
+      {% for t in transacoes %}
+      {% if not t.importada %}
+      <form id="extrato-tx-{{ loop.index }}" method="post" action="{{ url_for('salvar_transacao_extrato') }}">
+        <input type="hidden" name="token" value="{{ extrato_token }}" />
+        <input type="hidden" name="data" value="{{ t.data }}" />
+        <input type="hidden" name="descricao" value="{{ t.descricao }}" />
+        <input type="hidden" name="valor" value="{{ t.valor }}" />
+      </form>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
+
+  <!-- Tabela interativa -->
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>Contas Cadastradas</h2>
+        <p>Clique no status para alternar entre Pago / Pendente · Anexe o comprovante ao pagar</p>
+      </div>
+    </div>
+    <div class="panel-body" style="padding: 0;">
+      {% if contas %}
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Conta</th>
+              <th>Categoria</th>
+              <th>Forma</th>
+              <th>Vencimento</th>
+              <th>Valor</th>
+              <th>Status</th>
+              <th>Comprovante</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for conta in contas %}
+            <tr>
+              <td class="cell-strong">
+                {{ conta.nome }}
+                {% if conta.alerta_preco %}
+                <span class="alerta-preco"
+                      title="Este valor está {{ conta.alerta_preco.percentual | round(0) | int }}% acima da média dos últimos 3 meses (R$ {{ conta.alerta_preco.media | brl }}). Confira antes de pagar.">
+                  📈 Inflação de Preço
+                </span>
+                {% endif %}
+                {% if conta.fornecedor %}
+                <span class="conta-fornecedor">{{ conta.fornecedor }}</span>
+                {% endif %}
+              </td>
+              <td class="text-muted">{{ conta.categoria }}</td>
+              <td>
+                {% if conta.forma_pagamento == 'cartao' %}
+                <span class="forma-badge cartao" title="Fatura {{ conta.fatura_label }}">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="15" rx="2.5"></rect><path d="M2 10h20"></path></svg>
+                  {{ conta.fatura_label }}
+                </span>
+                {% else %}
+                <span class="text-muted">Boleto/Pix</span>
+                {% endif %}
+                {% if conta.conta_bancaria %}
+                <span class="conta-fornecedor" title="Conta de onde saiu o pagamento">🏦 {{ conta.conta_bancaria }}</span>
+                {% endif %}
+              </td>
+              <td>{{ conta.vencimento }}</td>
+              <td>R$ {{ conta.valor | brl }}</td>
+              <td>
+                <form method="post" action="{{ url_for('alternar_status_conta', conta_id=conta.id) }}" class="inline-form">
+                  <button type="submit" class="status-badge {{ conta.status }}">
+                    <span class="dot"></span>{{ conta.status | capitalize }}
+                  </button>
+                </form>
+              </td>
+              <td>
+                <div class="row-actions">
+                  {% if conta.comprovante %}
+                  <a href="{{ url_for('ver_comprovante', conta_id=conta.id) }}" target="_blank"
+                     class="btn-icon comprovante-ok" title="Ver comprovante">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"></path><path d="M14 3v5h5"></path><path d="m9.5 14.5 1.8 1.8 3.2-3.6"></path></svg>
+                  </a>
+                  {% endif %}
+                  <form method="post" action="{{ url_for('enviar_comprovante', conta_id=conta.id) }}"
+                        enctype="multipart/form-data" class="inline-form" data-comprovante-form>
+                    <input type="file" name="comprovante" accept=".pdf,.png,.jpg,.jpeg" hidden data-comprovante-input />
+                    <button type="button" class="btn-icon" data-comprovante-btn
+                            title="{{ 'Trocar comprovante' if conta.comprovante else 'Anexar comprovante de pagamento' }}">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                    </button>
+                  </form>
+                </div>
+              </td>
+              <td>
+                <div class="row-actions">
+                  <form method="post" action="{{ url_for('remover_conta', conta_id=conta.id) }}" class="inline-form" onsubmit="return confirm('Excluir esta conta?');">
+                    <button type="submit" class="btn-icon danger" title="Excluir">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"></path><path d="M10 11v6M14 11v6"></path><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"></path><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"></path></svg>
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state">Nenhuma conta cadastrada ainda. Use o formulário acima para adicionar a primeira.</div>
+      {% endif %}
+    </div>
+  </section>
+
+{% endblock %}

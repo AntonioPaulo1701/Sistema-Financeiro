@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+
+{% block title %}Cadastros - {{ NOME_CLINICA }}{% endblock %}
+{% block page_title %}Cadastros{% endblock %}
+{% block page_subtitle %}Plano de contas, categorias e fornecedores usados nos lançamentos{% endblock %}
+
+{% block content %}
+
+  {% if erro %}
+  <div class="form-error">{{ erro }}</div>
+  {% endif %}
+
+  <!-- Navegação entre as abas -->
+  <div class="abas-nav">
+    <button type="button" class="aba-botao {{ 'ativa' if aba_ativa == 'plano' }}" data-aba="plano">
+      🏦 Plano de Contas
+    </button>
+    <button type="button" class="aba-botao {{ 'ativa' if aba_ativa == 'categorias' }}" data-aba="categorias">
+      🏷️ Categorias
+    </button>
+    <button type="button" class="aba-botao {{ 'ativa' if aba_ativa == 'fornecedores' }}" data-aba="fornecedores">
+      🏢 Fornecedores
+    </button>
+    <button type="button" class="aba-botao {{ 'ativa' if aba_ativa == 'cartoes' }}" data-aba="cartoes">
+      💳 Cartões
+    </button>
+    <button type="button" class="aba-botao {{ 'ativa' if aba_ativa == 'procedimentos' }}" data-aba="procedimentos">
+      🦷 Procedimentos
+    </button>
+    <button type="button" class="aba-botao {{ 'ativa' if aba_ativa == 'colaboradores' }}" data-aba="colaboradores">
+      👩‍⚕️ Colaboradores
+    </button>
+  </div>
+
+  <!-- Aba: Plano de Contas (contas de onde sai o dinheiro) -->
+  <section class="panel aba-conteudo {{ 'ativa' if aba_ativa == 'plano' }}" data-aba-conteudo="plano">
+    <div class="panel-header">
+      <div>
+        <h2>Plano de Contas</h2>
+        <p>Cadastre as contas de onde sai o dinheiro dos pagamentos (ex: Conta Bradesco PF, Caixa da Clínica)</p>
+      </div>
+      <span class="automacao-badge {{ 'ativa' if contas_bancarias else 'inativa' }}">
+        {{ contas_bancarias | length }} conta(s)
+      </span>
+    </div>
+    <div class="panel-body">
+
+      <form method="post" action="{{ url_for('nova_conta_bancaria') }}" class="report-options" style="align-items: flex-end; margin-bottom: 18px;">
+        <div class="form-field" style="flex: 1; min-width: 240px;">
+          <label for="conta-bancaria-nome">Nova Conta</label>
+          <input type="text" id="conta-bancaria-nome" name="nome" placeholder="Ex: Conta Bradesco PF" required />
+        </div>
+        <button type="submit" class="btn btn-primary">Adicionar</button>
+      </form>
+
+      {% if contas_bancarias %}
+      <ul class="destinatarios-lista">
+        {% for cb in contas_bancarias %}
+        <li>
+          <span class="destinatario-info">
+            <strong>{{ cb.nome }}</strong>
+          </span>
+          <form method="post" action="{{ url_for('excluir_conta_bancaria', conta_bancaria_id=cb.id) }}" class="inline-form"
+                onsubmit="return confirm('Remover esta conta do plano de contas? Os lançamentos já feitos continuam existindo.');">
+            <button type="submit" class="btn-icon danger" title="Remover conta">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"></path><path d="M10 11v6M14 11v6"></path><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"></path><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"></path></svg>
+            </button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="empty-state" style="padding: 20px;">
+        Nenhuma conta cadastrada ainda. Ao lançar uma conta a pagar, você poderá escolher de qual
+        conta saiu o dinheiro — fica muito mais fácil saber de onde foi pago cada custo.
+      </div>
+      {% endif %}
+
+      <p class="form-hint">
+        As contas do plano aparecem no campo "Conta de Pagamento" ao lançar contas em
+        <a href="{{ url_for('contas') }}">Gestão de Contas</a> e no
+        <a href="{{ url_for('cartao') }}">Cartão de Crédito</a>.
+      </p>
+
+    </div>
+  </section>
+
+  <!-- Aba: Categorias -->
+  <section class="panel aba-conteudo {{ 'ativa' if aba_ativa == 'categorias' }}" data-aba-conteudo="categorias">
+    <div class="panel-header">
+      <div>
+        <h2>Categorias</h2>
+        <p>Tipos de gasto para classificar os lançamentos (ex: Material de Limpeza)</p>
+      </div>
+      <span class="automacao-badge ativa">{{ categorias | length }} categoria(s)</span>
+    </div>
+    <div class="panel-body">
+
+      <form method="post" action="{{ url_for('nova_categoria') }}" class="report-options" style="align-items: flex-end; margin-bottom: 18px;">
+        <div class="form-field" style="flex: 1; min-width: 240px;">
+          <label for="categoria-nome">Nova Categoria</label>
+          <input type="text" id="categoria-nome" name="nome" placeholder="Ex: Material de Limpeza" required />
+        </div>
+        <button type="submit" class="btn btn-primary">Adicionar</button>
+      </form>
+
+      <ul class="destinatarios-lista">
+        {% for c in categorias %}
+        <li>
+          <span class="destinatario-info">
+            <strong>{{ c.nome }}</strong>
+          </span>
+          <form method="post" action="{{ url_for('excluir_categoria', categoria_id=c.id) }}" class="inline-form"
+                onsubmit="return confirm('Remover esta categoria? As contas já lançadas com ela continuam existindo.');">
+            <button type="submit" class="btn-icon danger" title="Remover categoria">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"></path><path d="M10 11v6M14 11v6"></path><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"></path><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"></path></svg>
+            </button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+
+      <p class="form-hint">
+        As categorias aparecem no campo "Categoria" ao lançar contas em
+        <a href="{{ url_for('contas') }}">Gestão de Contas</a> e no
+        <a href="{{ url_for('cartao') }}">Cartão de Crédito</a>.
+      </p>
+
+    </div>
+  </section>
+
+  <!-- Aba: Fornecedores -->
+  <section class="panel aba-conteudo {{ 'ativa' if aba_ativa == 'fornecedores' }}" data-aba-conteudo="fornecedores">
+    <div class="panel-header">
+      <div>
+        <h2>Fornecedores</h2>
+        <p>Cadastre uma vez e escolha na lista ao lançar contas</p>
+      </div>
+      <span class="automacao-badge {{ 'ativa' if fornecedores else 'inativa' }}">
+        {{ fornecedores | length }} cadastrado(s)
+      </span>
+    </div>
+    <div class="panel-body">
+
+      <form method="post" action="{{ url_for('novo_fornecedor') }}" style="margin-bottom: 18px;">
+        <div class="form-grid" style="margin-bottom: 12px;">
+          <div class="form-field">
+            <label for="fornecedor-nome">Nome do Fornecedor</label>
+            <input type="text" id="fornecedor-nome" name="nome" placeholder="Ex: Dental Suprimentos Ltda" required />
+          </div>
+          <div class="form-field">
+            <label for="fornecedor-telefone">Telefone (opcional)</label>
+            <input type="text" id="fornecedor-telefone" name="telefone" placeholder="Ex: (11) 99999-9999" />
+          </div>
+        </div>
+        <div class="form-actions" style="margin-top: 0;">
+          <button type="submit" class="btn btn-primary">Cadastrar Fornecedor</button>
+        </div>
+      </form>
+
+      {% if fornecedores %}
+      <ul class="destinatarios-lista">
+        {% for f in fornecedores %}
+        <li>
+          <span class="destinatario-info">
+            <strong>{{ f.nome }}</strong>
+            {% if f.telefone %}<span class="text-muted">{{ f.telefone }}</span>{% endif %}
+          </span>
+          <form method="post" action="{{ url_for('excluir_fornecedor', fornecedor_id=f.id) }}" class="inline-form"
+                onsubmit="return confirm('Remover este fornecedor? As contas já lançadas continuam existindo.');">
+            <button type="submit" class="btn-icon danger" title="Remover fornecedor">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"></path><path d="M10 11v6M14 11v6"></path><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"></path><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"></path></svg>
+            </button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="empty-state" style="padding: 20px;">
+        Nenhum fornecedor cadastrado ainda. Use o formulário acima.
+      </div>
+      {% endif %}
+
+    </div>
+  </section>
+
+  <!-- Aba: Cartões de Crédito -->
+  <section class="panel aba-conteudo {{ 'ativa' if aba_ativa == 'cartoes' }}" data-aba-conteudo="cartoes">
+    <div class="panel-header">
+      <div>
+        <h2>Cartões de Crédito</h2>
+        <p>Cadastre os cartões da clínica para importar as faturas em OFX</p>
+      </div>
+      <span class="automacao-badge {{ 'ativa' if cartoes else 'inativa' }}">
+        {{ cartoes | length }} cartão(ões)
+      </span>
+    </div>
+    <div class="panel-body">
+
+      <form method="post" action="{{ url_for('novo_cartao') }}" class="report-options" style="align-items: flex-end; margin-bottom: 18px;">
+        <div class="form-field" style="flex: 1; min-width: 240px;">
+          <label for="cartao-nome-cadastro">Novo Cartão</label>
+          <input type="text" id="cartao-nome-cadastro" name="nome" placeholder="Ex: Nubank, Bradesco Visa" required />
+        </div>
+        <button type="submit" class="btn btn-primary">Adicionar</button>
+      </form>
+
+      {% if cartoes %}
+      <ul class="destinatarios-lista">
+        {% for cartao in cartoes %}
+        <li>
+          <span class="destinatario-info">
+            <strong>💳 {{ cartao.nome }}</strong>
+          </span>
+          <form method="post" action="{{ url_for('excluir_cartao', cartao_id=cartao.id) }}" class="inline-form"
+                onsubmit="return confirm('Remover este cartão? Os lançamentos já feitos continuam existindo.');">
+            <button type="submit" class="btn-icon danger" title="Remover cartão">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"></path><path d="M10 11v6M14 11v6"></path><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"></path><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"></path></svg>
+            </button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="empty-state" style="padding: 20px;">
+        Nenhum cartão cadastrado ainda. Cadastre para poder importar a fatura em OFX na aba
+        <a href="{{ url_for('cartao') }}">Cartão de Crédito</a>.
+      </div>
+      {% endif %}
+
+    </div>
+  </section>
+
+  <!-- Aba: Procedimentos (tabela de preços do prontuário) -->
+  <section class="panel aba-conteudo {{ 'ativa' if aba_ativa == 'procedimentos' }}" data-aba-conteudo="procedimentos">
+    <div class="panel-header">
+      <div>
+        <h2>Procedimentos</h2>
+        <p>Tabela de preços da clínica — é dela que saem os itens dos orçamentos do prontuário</p>
+      </div>
+      <span class="automacao-badge {{ 'ativa' if procedimentos else 'inativa' }}">
+        {{ procedimentos | length }} procedimento(s)
+      </span>
+    </div>
+    <div class="panel-body">
+
+      <form method="post" action="{{ url_for('novo_procedimento') }}" class="report-options" style="align-items: flex-end; margin-bottom: 18px;">
+        <div class="form-field" style="flex: 1; min-width: 240px;">
+          <label for="procedimento-nome">Procedimento</label>
+          <input type="text" id="procedimento-nome" name="nome" placeholder="Ex: Limpeza Infantil" required />
+        </div>
+        <div class="form-field" style="min-width: 140px;">
+          <label for="procedimento-valor">Valor</label>
+          <input type="number" id="procedimento-valor" name="valor" min="0.01" step="0.01" placeholder="Ex: 150,00" required />
+        </div>
+        <button type="submit" class="btn btn-primary">Adicionar</button>
+      </form>
+
+      {% if procedimentos %}
+      <ul class="destinatarios-lista">
+        {% for proc in procedimentos %}
+        <li>
+          <span class="destinatario-info">
+            <strong>🦷 {{ proc.nome }}</strong>
+            <span class="text-muted">R$ {{ proc.valor | brl }}</span>
+          </span>
+          <form method="post" action="{{ url_for('excluir_procedimento', procedimento_id=proc.id) }}" class="inline-form"
+                onsubmit="return confirm('Remover este procedimento da tabela de preços? Os orçamentos já criados continuam existindo.');">
+            <button type="submit" class="btn-icon danger" title="Remover procedimento">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"></path><path d="M10 11v6M14 11v6"></path><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"></path><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"></path></svg>
+            </button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="empty-state" style="padding: 20px;">
+        Nenhum procedimento na tabela de preços ainda. Cadastre para montar orçamentos no
+        prontuário dos <a href="{{ url_for('pacientes') }}">Pacientes</a>.
+      </div>
+      {% endif %}
+
+      <p class="form-hint">
+        Os procedimentos aparecem como opções ao criar um orçamento no prontuário do paciente,
+        na aba <a href="{{ url_for('pacientes') }}">Pacientes</a>.
+      </p>
+
+    </div>
+  </section>
+
+  <!-- Aba: Colaboradores (responsáveis por orçamentos e checkouts) -->
+  <section class="panel aba-conteudo {{ 'ativa' if aba_ativa == 'colaboradores' }}" data-aba-conteudo="colaboradores">
+    <div class="panel-header">
+      <div>
+        <h2>Colaboradores</h2>
+        <p>Quem monta orçamentos e faz o checkout no prontuário — fica registrado em cada operação</p>
+      </div>
+      <span class="automacao-badge {{ 'ativa' if colaboradores else 'inativa' }}">
+        {{ colaboradores | length }} colaborador(es)
+      </span>
+    </div>
+    <div class="panel-body">
+
+      <form method="post" action="{{ url_for('novo_colaborador') }}" class="report-options" style="align-items: flex-end; margin-bottom: 18px;">
+        <div class="form-field" style="flex: 1; min-width: 240px;">
+          <label for="colaborador-nome">Colaborador</label>
+          <input type="text" id="colaborador-nome" name="nome" placeholder="Ex: Dra. Ana" required />
+        </div>
+        <button type="submit" class="btn btn-primary">Adicionar</button>
+      </form>
+
+      {% if colaboradores %}
+      <ul class="destinatarios-lista">
+        {% for colab in colaboradores %}
+        <li>
+          <span class="destinatario-info">
+            <strong>👩‍⚕️ {{ colab.nome }}</strong>
+          </span>
+          <form method="post" action="{{ url_for('excluir_colaborador', colaborador_id=colab.id) }}" class="inline-form"
+                onsubmit="return confirm('Remover este colaborador? Os orçamentos e checkouts já feitos continuam registrados.');">
+            <button type="submit" class="btn-icon danger" title="Remover colaborador">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"></path><path d="M10 11v6M14 11v6"></path><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"></path><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"></path></svg>
+            </button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="empty-state" style="padding: 20px;">
+        Nenhum colaborador cadastrado ainda. Cadastre para registrar o responsável por cada
+        orçamento e checkout do prontuário.
+      </div>
+      {% endif %}
+
+    </div>
+  </section>
+
+{% endblock %}

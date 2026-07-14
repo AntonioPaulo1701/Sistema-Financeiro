@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Pacientes - {{ NOME_CLINICA }}{% endblock %}
+{% block page_title %}Pacientes{% endblock %}
+{% block page_subtitle %}Prontuário digital integrado ao financeiro — clique num paciente para abrir{% endblock %}
+
+{% block content %}
+
+  {% if erro %}
+  <div class="form-error">{{ erro }}</div>
+  {% endif %}
+
+  <!-- Novo paciente -->
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>Novo Paciente</h2>
+        <p>Cadastre uma vez — o telefone já fica pronto para as cobranças pelo WhatsApp</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <form method="post" action="{{ url_for('novo_paciente') }}">
+        <div class="form-grid" style="margin-bottom: 12px;">
+          <div class="form-field">
+            <label for="paciente-nome">Nome</label>
+            <input type="text" id="paciente-nome" name="nome" placeholder="Ex: Maria Souza" required />
+          </div>
+          <div class="form-field">
+            <label for="paciente-telefone">Telefone</label>
+            <input type="text" id="paciente-telefone" name="telefone" placeholder="Ex: (11) 99999-9999" required />
+          </div>
+          <div class="form-field">
+            <label for="paciente-cpf">CPF</label>
+            <input type="text" id="paciente-cpf" name="cpf" placeholder="Ex: 123.456.789-00" />
+          </div>
+          <div class="form-field">
+            <label for="paciente-nascimento">Nascimento</label>
+            <input type="date" id="paciente-nascimento" name="data_nascimento" />
+          </div>
+        </div>
+        <p class="form-hint" style="margin-top: 0;">
+          CPF e nascimento são opcionais. O telefone é normalizado automaticamente para o
+          padrão do WhatsApp (+55...), pronto para a cobrança automática dos boletos.
+        </p>
+        <div class="form-actions" style="margin-top: 8px; justify-content: flex-start;">
+          <button type="submit" class="btn btn-primary">Cadastrar Paciente</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- Lista de pacientes -->
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>Pacientes Cadastrados</h2>
+        <p>Clique no nome para abrir o prontuário completo (cadastro, orçamentos e financeiro)</p>
+      </div>
+      <span class="automacao-badge {{ 'ativa' if pacientes else 'inativa' }}">
+        {{ pacientes | length }} paciente(s)
+      </span>
+    </div>
+    <div class="panel-body" style="padding: 0;">
+      {% if pacientes %}
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Paciente</th>
+              <th>Telefone</th>
+              <th>CPF</th>
+              <th>Nascimento</th>
+              <th>Orçamentos</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in pacientes %}
+            <tr>
+              <td class="cell-strong">
+                <a href="{{ url_for('prontuario', paciente_id=p.id) }}" class="paciente-link">🧒 {{ p.nome }}</a>
+              </td>
+              <td class="text-muted">{{ p.telefone }}</td>
+              <td class="text-muted">{{ p.cpf }}</td>
+              <td class="text-muted">{{ p.nascimento }}</td>
+              <td class="text-muted">{{ p.qtd_orcamentos }}</td>
+              <td>
+                <a href="{{ url_for('prontuario', paciente_id=p.id) }}" class="btn btn-secondary" style="padding: 6px 12px; font-size: 12.5px;">
+                  Abrir Prontuário
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state">
+        Nenhum paciente cadastrado ainda. Use o formulário acima — depois é só clicar no nome
+        para abrir o prontuário com orçamentos e checkout.
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+{% endblock %}

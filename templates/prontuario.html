@@ -1,0 +1,426 @@
+{% extends "base.html" %}
+
+{% block title %}{{ paciente.nome }} - Prontuário - {{ NOME_CLINICA }}{% endblock %}
+{% block page_title %}🧒 {{ paciente.nome }}{% endblock %}
+{% block page_subtitle %}Prontuário digital — paciente desde {{ paciente.criado_em }}{% endblock %}
+
+{% block content %}
+
+  {% if erro %}
+  <div class="form-error">{{ erro }}</div>
+  {% endif %}
+
+  <p style="margin: 0 0 16px;">
+    <a href="{{ url_for('pacientes') }}" class="btn btn-secondary" style="padding: 6px 14px; font-size: 12.5px;">
+      ← Voltar para Pacientes
+    </a>
+  </p>
+
+  <!-- Navegação entre as sub-abas do prontuário -->
+  <div class="abas-nav">
+    <button type="button" class="aba-botao {{ 'ativa' if aba_ativa == 'cadastro' }}" data-aba="cadastro">
+      📋 Cadastro
+    </button>
+    <button type="button" class="aba-botao {{ 'ativa' if aba_ativa == 'orcamentos' }}" data-aba="orcamentos">
+      🦷 Orçamentos
+    </button>
+    <button type="button" class="aba-botao {{ 'ativa' if aba_ativa == 'financeiro' }}" data-aba="financeiro">
+      💰 Financeiro / Checkout
+    </button>
+  </div>
+
+  <!-- Sub-aba: Cadastro -->
+  <section class="panel aba-conteudo {{ 'ativa' if aba_ativa == 'cadastro' }}" data-aba-conteudo="cadastro">
+    <div class="panel-header">
+      <div>
+        <h2>Dados do Paciente</h2>
+        <p>O telefone é normalizado para o padrão do WhatsApp e usado nas cobranças automáticas</p>
+      </div>
+    </div>
+    <div class="panel-body">
+
+      <!-- Foto do paciente (avatar) -->
+      <div class="paciente-foto-bloco">
+        {% if paciente.foto %}
+        <img class="paciente-avatar"
+             src="{{ url_for('ver_foto_paciente', paciente_id=paciente.id) }}?v={{ paciente.foto }}"
+             alt="Foto de {{ paciente.nome }}" />
+        {% else %}
+        <div class="paciente-avatar paciente-avatar-vazio">{{ paciente.nome[:1] | upper }}</div>
+        {% endif %}
+        <div>
+          <form method="post" action="{{ url_for('enviar_foto_paciente', paciente_id=paciente.id) }}"
+                enctype="multipart/form-data" id="form-foto-paciente">
+            <input type="file" name="foto" accept=".png,.jpg,.jpeg" id="input-foto-paciente" hidden />
+            <button type="button" class="btn btn-secondary"
+                    onclick="document.getElementById('input-foto-paciente').click()">📷 Alterar Foto</button>
+          </form>
+          <p class="form-hint" style="margin-top: 8px;">
+            PNG ou JPG, até 10 MB. A foto aparece aqui e na busca global do topo.
+          </p>
+        </div>
+      </div>
+
+      <form method="post" action="{{ url_for('editar_paciente', paciente_id=paciente.id) }}">
+        <div class="form-grid" style="margin-bottom: 12px;">
+          <div class="form-field">
+            <label for="edit-nome">Nome</label>
+            <input type="text" id="edit-nome" name="nome" value="{{ paciente.nome }}" required />
+          </div>
+          <div class="form-field">
+            <label for="edit-telefone">Telefone</label>
+            <input type="text" id="edit-telefone" name="telefone" value="{{ paciente.telefone }}" required />
+          </div>
+          <div class="form-field">
+            <label for="edit-cpf">CPF</label>
+            <input type="text" id="edit-cpf" name="cpf" value="{{ paciente.cpf }}" placeholder="Ex: 123.456.789-00" />
+          </div>
+          <div class="form-field">
+            <label for="edit-nascimento">Nascimento</label>
+            <input type="date" id="edit-nascimento" name="data_nascimento" value="{{ paciente.data_nascimento }}" />
+          </div>
+        </div>
+        <div class="form-actions" style="justify-content: flex-start;">
+          <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+        </div>
+      </form>
+
+      <form method="post" action="{{ url_for('excluir_paciente', paciente_id=paciente.id) }}"
+            onsubmit="return confirm('Excluir este paciente? Só é possível quando ele não tem orçamentos no prontuário.');"
+            style="margin-top: 16px;">
+        <button type="submit" class="btn btn-secondary" style="color: var(--color-danger);">Excluir Paciente</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- Sub-aba: Orçamentos -->
+  <div class="aba-conteudo {{ 'ativa' if aba_ativa == 'orcamentos' }}" data-aba-conteudo="orcamentos">
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Novo Orçamento</h2>
+          <p>Marque os procedimentos da tabela de preços — o total é calculado sozinho</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        {% if procedimentos %}
+        <form method="post" action="{{ url_for('novo_orcamento', paciente_id=paciente.id) }}">
+          <div class="procedimentos-lista">
+            {% for proc in procedimentos %}
+            <label class="procedimento-opcao">
+              <input type="checkbox" name="procedimentos" value="{{ proc.id }}" data-valor="{{ proc.valor }}" />
+              <span class="procedimento-nome">{{ proc.nome }}</span>
+              <span class="procedimento-valor">R$ {{ proc.valor | brl }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          <div class="report-options" style="align-items: flex-end; margin: 16px 0 0;">
+            <div class="form-field" style="min-width: 220px;">
+              <label for="orcamento-colaborador">Colaborador</label>
+              <select id="orcamento-colaborador" name="colaborador_id">
+                <option value="">Sem responsável</option>
+                {% for c in colaboradores %}
+                <option value="{{ c.id }}">{{ c.nome }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary">
+              Salvar Orçamento <span data-total-orcamento></span>
+            </button>
+          </div>
+          <p class="form-hint">
+            Quem monta a tabela de preços é a sub-aba Procedimentos em
+            <a href="{{ url_for('cadastros', aba='procedimentos') }}">Cadastros</a>; colaboradores
+            ficam na sub-aba <a href="{{ url_for('cadastros', aba='colaboradores') }}">Colaboradores</a>.
+          </p>
+        </form>
+        {% else %}
+        <div class="empty-state" style="padding: 20px;">
+          A tabela de preços está vazia. Cadastre os procedimentos da clínica na sub-aba
+          <a href="{{ url_for('cadastros', aba='procedimentos') }}">Procedimentos, em Cadastros</a>,
+          para poder montar orçamentos.
+        </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Orçamentos do Paciente</h2>
+          <p>Aprove o orçamento aceito pela família — o checkout fica na sub-aba Financeiro</p>
+        </div>
+        <span class="automacao-badge {{ 'ativa' if orcamentos else 'inativa' }}">
+          {{ orcamentos | length }} orçamento(s)
+        </span>
+      </div>
+      <div class="panel-body" style="padding: 0;">
+        {% if orcamentos %}
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Procedimentos</th>
+                <th>Colaborador</th>
+                <th>Total</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for o in orcamentos %}
+              <tr>
+                <td>{{ o.data }}</td>
+                <td class="orcamento-itens">{{ o.itens }}</td>
+                <td class="text-muted">{{ o.colaborador }}</td>
+                <td class="cell-strong">R$ {{ o.valor_total | brl }}</td>
+                <td><span class="status-badge {{ o.status }}"><span class="dot"></span>{{ o.status_label }}</span></td>
+                <td>
+                  <div style="display: flex; gap: 6px;">
+                    {% if o.status == 'pendente' %}
+                    <form method="post" action="{{ url_for('aprovar_orcamento', paciente_id=paciente.id, orcamento_id=o.id) }}" class="inline-form">
+                      <button type="submit" class="btn btn-success" style="padding: 6px 12px; font-size: 12.5px;">Aprovar</button>
+                    </form>
+                    {% endif %}
+                    {% if o.status != 'faturado' %}
+                    <form method="post" action="{{ url_for('excluir_orcamento', paciente_id=paciente.id, orcamento_id=o.id) }}" class="inline-form"
+                          onsubmit="return confirm('Excluir este orçamento?');">
+                      <button type="submit" class="btn-icon danger" title="Excluir orçamento">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"></path><path d="M10 11v6M14 11v6"></path><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"></path><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"></path></svg>
+                      </button>
+                    </form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="empty-state">Nenhum orçamento ainda. Monte o primeiro no painel acima.</div>
+        {% endif %}
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Sub-aba: Financeiro / Checkout -->
+  <div class="aba-conteudo {{ 'ativa' if aba_ativa == 'financeiro' }}" data-aba-conteudo="financeiro">
+
+    <div class="stat-grid">
+      <div class="stat-tile tone-warning">
+        <div class="stat-tile-top">
+          <span class="stat-label">Aguardando Aprovação</span>
+        </div>
+        <div class="stat-value">R$ {{ resumo_financeiro.pendente.total | brl }}</div>
+        <div class="stat-sub">{{ resumo_financeiro.pendente.qtd }} orçamento(s) pendente(s)</div>
+      </div>
+      <div class="stat-tile tone-teal">
+        <div class="stat-tile-top">
+          <span class="stat-label">Prontos para Checkout</span>
+        </div>
+        <div class="stat-value">R$ {{ resumo_financeiro.aprovado.total | brl }}</div>
+        <div class="stat-sub">{{ resumo_financeiro.aprovado.qtd }} orçamento(s) aprovado(s)</div>
+      </div>
+      <div class="stat-tile tone-success">
+        <div class="stat-tile-top">
+          <span class="stat-label">Faturado</span>
+        </div>
+        <div class="stat-value">R$ {{ resumo_financeiro.faturado.total | brl }}</div>
+        <div class="stat-sub">{{ resumo_financeiro.faturado.qtd }} checkout(s) concluído(s)</div>
+      </div>
+    </div>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Checkout de Orçamentos Aprovados</h2>
+          <p>À vista entra como recebido hoje; boleto vira cobrança automática pelo WhatsApp</p>
+        </div>
+      </div>
+      <div class="panel-body" style="padding: 0;">
+        {% set aprovados = orcamentos | selectattr('status', 'equalto', 'aprovado') | list %}
+        {% if aprovados %}
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Procedimentos</th>
+                <th>Total</th>
+                <th>Checkout</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for o in aprovados %}
+              <tr>
+                <td>{{ o.data }}</td>
+                <td class="orcamento-itens">{{ o.itens }}</td>
+                <td class="cell-strong">R$ {{ o.valor_total | brl }}</td>
+                <td>
+                  <button type="button" class="btn btn-primary" style="padding: 7px 14px; font-size: 12.5px;"
+                          data-orcamento-id="{{ o.id }}" data-valor="{{ o.valor_total | brl }}"
+                          onclick="abrirModalCheckout(this)">
+                    💰 Efetuar Checkout
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+          Nenhum orçamento aprovado esperando checkout. Aprove um orçamento na sub-aba Orçamentos.
+        </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Histórico de Checkouts</h2>
+          <p>Cada checkout gera uma cobrança na aba Cobrança de Boletos — o elo fica registrado aqui</p>
+        </div>
+      </div>
+      <div class="panel-body" style="padding: 0;">
+        {% set faturados = orcamentos | selectattr('status', 'equalto', 'faturado') | list %}
+        {% if faturados %}
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Checkout</th>
+                <th>Procedimentos</th>
+                <th>Total</th>
+                <th>Forma</th>
+                <th>Colaborador</th>
+                <th>Situação da Cobrança</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for o in faturados %}
+              <tr>
+                <td>{{ o.checkout_em }}</td>
+                <td class="orcamento-itens">{{ o.itens }}</td>
+                <td class="cell-strong">R$ {{ o.valor_total | brl }}</td>
+                <td class="text-muted">{{ o.checkout_forma }}</td>
+                <td class="text-muted">{{ o.checkout_colaborador }}</td>
+                <td>
+                  {% if o.cobranca_status %}
+                  <span class="status-badge {{ o.cobranca_status }}">
+                    <span class="dot"></span>{{ o.cobranca_status | capitalize }}
+                    {% if o.cobranca_vencimento and o.cobranca_status != 'pago' %} · vence {{ o.cobranca_vencimento }}{% endif %}
+                  </span>
+                  {% else %}
+                  <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="empty-state">Nenhum checkout feito ainda.</div>
+        {% endif %}
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Modal de Checkout (aberto pelo botão "Efetuar Checkout") -->
+  <dialog id="modal-checkout" class="modal-recado">
+    <h3>Checkout do Orçamento</h3>
+    <p class="modal-recado-cliente">
+      Total de <strong id="checkout-valor"></strong> para <strong>{{ paciente.nome }}</strong>.
+    </p>
+    <form method="post" id="form-checkout">
+      <div class="form-field">
+        <label>Forma de pagamento</label>
+        <div class="checkout-formas">
+          <label class="checkout-forma-opcao">
+            <input type="radio" name="forma_pagamento" value="avista" checked
+                   onchange="alternarVencimentoCheckout()" />
+            💵 À vista
+          </label>
+          <label class="checkout-forma-opcao">
+            <input type="radio" name="forma_pagamento" value="boleto"
+                   onchange="alternarVencimentoCheckout()" />
+            🧾 Boleto
+          </label>
+        </div>
+      </div>
+      <div class="form-field" id="campo-vencimento-checkout" style="display: none;">
+        <label for="checkout-vencimento">Vencimento do boleto</label>
+        <input type="date" id="checkout-vencimento" name="data_vencimento" />
+      </div>
+      <div class="form-field">
+        <label for="checkout-colaborador">Colaborador do checkout</label>
+        <select id="checkout-colaborador" name="colaborador_id" required>
+          <option value="">Escolher…</option>
+          {% for c in colaboradores %}
+          <option value="{{ c.id }}">{{ c.nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <p class="form-hint">
+        À vista: entra como recebido hoje (conta na Meta de Arrecadação). Boleto: vira uma
+        cobrança pendente na aba Cobrança de Boletos, com lembrete e cobrança automática
+        pelo WhatsApp na Régua.
+      </p>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-checkout').close()">Fechar</button>
+        <button type="submit" class="btn btn-success">Confirmar Checkout</button>
+      </div>
+    </form>
+  </dialog>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // ----- Modal de Checkout -----
+  function abrirModalCheckout(botao) {
+    const modal = document.getElementById("modal-checkout");
+    document.getElementById("checkout-valor").textContent = `R$ ${botao.dataset.valor}`;
+    document.getElementById("form-checkout").action =
+      `/pacientes/{{ paciente.id }}/orcamentos/${botao.dataset.orcamentoId}/checkout`;
+    alternarVencimentoCheckout();
+    modal.showModal();
+  }
+
+  // Campo de vencimento só aparece quando a forma escolhida é boleto.
+  function alternarVencimentoCheckout() {
+    const boleto = document.querySelector('#form-checkout input[value="boleto"]').checked;
+    document.getElementById("campo-vencimento-checkout").style.display = boleto ? "" : "none";
+  }
+
+  // Clicar no fundo escurecido fecha o modal.
+  document.getElementById("modal-checkout").addEventListener("click", (evento) => {
+    if (evento.target === evento.currentTarget) evento.currentTarget.close();
+  });
+
+  // ----- Foto do paciente: escolher o arquivo já envia (sem segundo clique) -----
+  document.getElementById("input-foto-paciente").addEventListener("change", (evento) => {
+    if (evento.target.files.length > 0) document.getElementById("form-foto-paciente").submit();
+  });
+
+  // ----- Total do orçamento em tempo real (soma dos procedimentos marcados) -----
+  const BRL_PRONTUARIO = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+  document.querySelectorAll('.procedimento-opcao input[type="checkbox"]').forEach((caixa) => {
+    caixa.addEventListener("change", () => {
+      let total = 0;
+      document.querySelectorAll('.procedimento-opcao input:checked').forEach((c) => {
+        total += parseFloat(c.dataset.valor);
+      });
+      const alvo = document.querySelector("[data-total-orcamento]");
+      alvo.textContent = total > 0 ? `— ${BRL_PRONTUARIO.format(total)}` : "";
+    });
+  });
+</script>
+{% endblock %}

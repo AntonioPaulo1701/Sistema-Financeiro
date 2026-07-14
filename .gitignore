@@ -1,0 +1,49 @@
+# Banco de dados local (SQLite)
+*.db
+*.sqlite
+*.sqlite3
+financas.db
+
+# Ambientes virtuais Python
+venv/
+.venv/
+env/
+ENV/
+
+# Cache e bytecode do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Segredos e configuração local
+.env
+.env.*
+*.local
+
+# Arquivos enviados pelos usuários e logs
+uploads/
+logs/
+*.log
+
+# Artefatos do PyWhatKit (WhatsApp)
+PyWhatKit_DB.txt
+
+# Instância do Flask
+instance/
+
+# Distribuição e build
+build/
+dist/
+*.egg-info/
+
+# IDEs e editores
+.vscode/
+.idea/
+
+# Sistema operacional
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Claude Code (configuração local da sessão)
+.claude/settings.local.json

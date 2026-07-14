@@ -1,0 +1,511 @@
+{% extends "base.html" %}
+
+{% block title %}Cobrança de Boletos - {{ NOME_CLINICA }}{% endblock %}
+{% block page_title %}Cobrança de Boletos{% endblock %}
+{% block page_subtitle %}Cadastre os boletos emitidos e acompanhe quem já pagou{% endblock %}
+
+{% block content %}
+
+  {% if status_envio %}
+  <div class="status-message {{ status_envio.tipo }}">{{ status_envio.texto }}</div>
+  {% endif %}
+
+  <!-- Meta de Arrecadação Mensal: barra de progresso do recebido sobre a meta -->
+  {% if meta %}
+  <section class="panel meta-panel">
+    <div class="panel-body">
+      <div class="meta-topo">
+        <div>
+          <strong>Meta de Arrecadação de {{ metricas.mes_label }}</strong>
+          <span class="meta-valores">R$ {{ meta.recebido | brl }} recebidos de R$ {{ meta.meta | brl }}</span>
+        </div>
+        <span class="meta-percentual {{ meta.tom }}">{{ meta.percentual_label }}%</span>
+      </div>
+      <div class="meta-barra" role="progressbar" aria-valuenow="{{ meta.largura | round | int }}"
+           aria-valuemin="0" aria-valuemax="100" aria-label="Progresso da meta de arrecadação do mês">
+        <div class="meta-barra-fill {{ meta.tom }}" style="width: {{ meta.largura }}%;"></div>
+      </div>
+      <p class="meta-frase">{{ meta.frase }}</p>
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- Cards de métricas do mês -->
+  <section class="stat-grid">
+
+    <article class="stat-tile tone-teal">
+      <div class="stat-tile-top">
+        <span class="stat-label">Previsto no Mês</span>
+        <span class="stat-icon-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2.5"></rect><path d="M8 2v4M16 2v4M3 10h18"></path></svg>
+        </span>
+      </div>
+      <div class="stat-value">R$ {{ metricas.previsto | brl }}</div>
+      <div class="stat-sub">{{ metricas.qtd }} boleto(s) vencendo em {{ metricas.mes_label }}</div>
+    </article>
+
+    <article class="stat-tile tone-success">
+      <div class="stat-tile-top">
+        <span class="stat-label">Recebido</span>
+        <span class="stat-icon-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="m8.5 12.5 2.5 2.5 5-5"></path></svg>
+        </span>
+      </div>
+      <div class="stat-value">R$ {{ metricas.recebido | brl }}</div>
+      <div class="stat-sub">{{ metricas.qtd_pagos }} boleto(s) recebido(s) no mês</div>
+    </article>
+
+    <article class="stat-tile tone-danger">
+      <div class="stat-tile-top">
+        <span class="stat-label">Inadimplente</span>
+        <span class="stat-icon-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 2.6 18a1.8 1.8 0 0 0 1.6 2.6h15.6a1.8 1.8 0 0 0 1.6-2.6L13.7 3.9a1.8 1.8 0 0 0-3.4 0Z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>
+        </span>
+      </div>
+      <div class="stat-value">R$ {{ metricas.inadimplente | brl }}</div>
+      <div class="stat-sub">{{ metricas.qtd_inadimplentes }} boleto(s) vencido(s) sem pagamento</div>
+    </article>
+
+    <article class="stat-tile tone-warning">
+      <div class="stat-tile-top">
+        <span class="stat-label">Taxa de Inadimplência</span>
+        <span class="stat-icon-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"></path><path d="M17 7h4v4"></path></svg>
+        </span>
+      </div>
+      <div class="stat-value">{{ ('%.1f' % metricas.taxa_inadimplencia) | replace('.', ',') }}%</div>
+      <div class="stat-sub">do valor previsto para {{ metricas.mes_label }}</div>
+    </article>
+
+  </section>
+
+  <!-- Gráficos -->
+  <div class="dashboard-split" style="margin-bottom: 24px;">
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Histórico de Recebimentos</h2>
+          <p>Total recebido por mês de vencimento, últimos 6 meses</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        {% if historico | sum(attribute='total') > 0 %}
+        <div class="chart-box"><canvas id="grafico-historico"></canvas></div>
+        {% else %}
+        <div class="empty-state">Nenhum recebimento registrado nos últimos 6 meses.</div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Recebido × Inadimplência</h2>
+          <p>Situação dos boletos de {{ metricas.mes_label }}</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        {% if metricas.previsto > 0 %}
+        <div class="chart-box"><canvas id="grafico-situacao"></canvas></div>
+        {% else %}
+        <div class="empty-state">Nenhum boleto vencendo neste mês para exibir.</div>
+        {% endif %}
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Formulário de cadastro -->
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>Novo Boleto</h2>
+        <p>Preencha os dados do boleto emitido para o cliente</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      {% if erro %}
+      <div class="form-error">{{ erro }}</div>
+      {% endif %}
+      <form method="post" action="{{ url_for('novo_boleto') }}">
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="nome_cliente">Nome do Cliente</label>
+            <input type="text" id="nome_cliente" name="nome_cliente" placeholder="Ex: Maria Silva" required />
+          </div>
+          <div class="form-field">
+            <label for="telefone">Telefone</label>
+            <input type="tel" id="telefone" name="telefone" placeholder="(11) 99999-9999" required />
+          </div>
+          <div class="form-field">
+            <label for="valor">Valor (R$)</label>
+            <input type="number" id="valor" name="valor" step="0.01" min="0.01" placeholder="0,00" required />
+          </div>
+          <div class="form-field">
+            <label for="data_vencimento">Vencimento</label>
+            <input type="date" id="data_vencimento" name="data_vencimento" required />
+          </div>
+        </div>
+        <p class="form-hint">
+          Digite o telefone com DDD — o sistema completa o +55 do Brasil automaticamente e deixa o
+          número pronto para a cobrança pelo WhatsApp. Boletos que passam do vencimento sem pagamento
+          aparecem como <strong>Vencido</strong> na tabela abaixo, com os dias de atraso.
+        </p>
+        <div class="form-actions">
+          <button type="reset" class="btn btn-secondary">Limpar</button>
+          <button type="submit" class="btn btn-primary">Cadastrar Boleto</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- Tabela de boletos -->
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>Boletos Cadastrados</h2>
+        <p>Boletos que os seus clientes devem · Clique no status para marcar Recebido / A Receber</p>
+      </div>
+      <form method="post" action="{{ url_for('cobrar_boletos') }}" class="inline-form"
+            onsubmit="return confirm('Enviar a mensagem de cobrança pelo WhatsApp para todos os boletos vencidos?');">
+        <button type="submit" class="btn btn-primary">Cobrar Vencidos no WhatsApp</button>
+      </form>
+    </div>
+    <div class="panel-body" style="padding: 0;">
+      {% if boletos %}
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th>Telefone</th>
+              <th>Vencimento</th>
+              <th>Valor</th>
+              <th>Último Aviso</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for boleto in boletos %}
+            <tr>
+              <td class="cell-strong">
+                {{ boleto.nome_cliente }}
+                <span class="risco-selo {{ boleto.risco.nivel }}" data-tooltip="{{ boleto.risco.tooltip }}">
+                  <span class="dot"></span>{{ boleto.risco.label }}
+                </span>
+              </td>
+              <td class="text-muted">{{ boleto.telefone }}</td>
+              <td>
+                {{ boleto.vencimento }}
+                {% if boleto.dias_atraso > 0 %}
+                <span class="conta-fornecedor">{{ boleto.dias_atraso }} dia(s) de atraso</span>
+                {% endif %}
+              </td>
+              <td>R$ {{ boleto.valor | brl }}</td>
+              <td>
+                {% if boleto.ultimo_aviso %}
+                <span title="Última mensagem enviada pelo WhatsApp para este boleto">💬 {{ boleto.ultimo_aviso }}</span>
+                {% else %}
+                <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td>
+                <form method="post" action="{{ url_for('alternar_status_boleto', boleto_id=boleto.id) }}" class="inline-form">
+                  <button type="submit" class="status-badge {{ boleto.status }}">
+                    <span class="dot"></span>{{ boleto.status_label }}
+                  </button>
+                </form>
+              </td>
+              <td>
+                <div class="row-actions">
+                  <button type="button"
+                          class="btn-icon{% if boleto.mensagem_agendada_data %} recado-marcado{% endif %}"
+                          title="{% if boleto.mensagem_agendada_br %}Recado agendado para {{ boleto.mensagem_agendada_br }} — clique para ver ou alterar{% else %}Agendar recado personalizado{% endif %}"
+                          onclick="abrirModalRecado(this)"
+                          data-boleto-id="{{ boleto.id }}"
+                          data-cliente="{{ boleto.nome_cliente }}"
+                          data-data="{{ boleto.mensagem_agendada_data or '' }}"
+                          data-texto="{{ boleto.mensagem_agendada_texto }}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2.5"></rect><path d="M8 2v4M16 2v4M3 10h18"></path><path d="M12 14v4M10 16h4"></path></svg>
+                  </button>
+                  <form method="post" action="{{ url_for('remover_boleto', boleto_id=boleto.id) }}" class="inline-form" onsubmit="return confirm('Excluir este boleto?');">
+                    <button type="submit" class="btn-icon danger" title="Excluir">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"></path><path d="M10 11v6M14 11v6"></path><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"></path><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"></path></svg>
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state">Nenhum boleto cadastrado ainda. Use o formulário acima para adicionar o primeiro.</div>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- Configuração da régua de cobrança -->
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>Régua de Cobrança</h2>
+        <p>Mensagens automáticas enviadas todos os dias, junto com o envio diário</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <ul class="regua-lista">
+        <li class="regua-etapa">
+          <span class="regua-icone lembrete">💚</span>
+          <div>
+            <strong>Lembrete Prévio</strong>
+            <span>{{ dias_lembrete }} dia(s) antes do vencimento — aviso amigável de que o boleto está chegando</span>
+          </div>
+        </li>
+        <li class="regua-etapa">
+          <span class="regua-icone hoje">📆</span>
+          <div>
+            <strong>Alerta do Dia</strong>
+            <span>No dia do vencimento — lembrete de que o boleto vence hoje</span>
+          </div>
+        </li>
+        <li class="regua-etapa">
+          <span class="regua-icone vencido">⚠️</span>
+          <div>
+            <strong>Cobrança</strong>
+            <span>
+              Após o vencimento —
+              {% if intervalo_cobranca == 1 %}
+              mensagem de cobrança todos os dias até o pagamento
+              {% else %}
+              mensagem de cobrança a cada {{ intervalo_cobranca }} dias até o pagamento
+              {% endif %}
+            </span>
+          </div>
+        </li>
+      </ul>
+      <form method="post" action="{{ url_for('salvar_regua') }}" class="regua-form">
+        <div class="form-field">
+          <label for="dias_lembrete">Lembrete antes do vencimento</label>
+          <input type="number" id="dias_lembrete" name="dias_lembrete" min="1" max="30" step="1"
+                 value="{{ dias_lembrete }}" required style="max-width: 120px;" />
+        </div>
+        <div class="form-field">
+          <label for="intervalo_cobranca">Cobrança após o vencimento</label>
+          <input type="number" id="intervalo_cobranca" name="intervalo_cobranca" min="1" max="30" step="1"
+                 value="{{ intervalo_cobranca }}" required style="max-width: 120px;" />
+        </div>
+        <button type="submit" class="btn btn-primary">Salvar Régua</button>
+      </form>
+      <p class="form-hint">
+        Os dois campos aceitam de 1 a 30 dias. O primeiro define quantos dias antes do vencimento
+        o cliente recebe o lembrete. O segundo define o ritmo da cobrança depois que o boleto vence:
+        1 cobra todos os dias, 3 cobra de três em três dias, e assim por diante — sempre até o
+        pagamento. O alerta do dia é fixo (sempre no vencimento) e ninguém recebe mais de uma
+        mensagem no mesmo dia.
+      </p>
+    </div>
+  </section>
+
+  <!-- Configuração da Meta de Arrecadação Mensal -->
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>Meta de Arrecadação Mensal</h2>
+        <p>Defina quanto você quer receber de boletos por mês</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <form method="post" action="{{ url_for('salvar_meta') }}" class="regua-form">
+        <div class="form-field">
+          <label for="meta_mensal">Meta do mês</label>
+          <input type="number" id="meta_mensal" name="meta_mensal" step="0.01" min="0"
+                 value="{{ '%.2f' % meta.meta if meta else '' }}" placeholder="0,00"
+                 style="max-width: 160px;" />
+        </div>
+        <button type="submit" class="btn btn-primary">Salvar Meta</button>
+      </form>
+      <p class="form-hint">
+        Digite o valor em reais. A barra de progresso no topo da página compara o que já foi
+        recebido no mês com esta meta e comemora com você quando ela é batida. Para desligar a
+        barra, deixe o campo em branco ou com 0 e salve.
+      </p>
+    </div>
+  </section>
+
+  <!-- Modal de Agendamento de Mensagem Customizada (aberto pelo botão de
+       calendário na tabela; o JS preenche com os dados do boleto clicado) -->
+  <dialog id="modal-recado" class="modal-recado">
+    <h3>Recado Personalizado</h3>
+    <p class="modal-recado-cliente">
+      Para <strong id="recado-cliente"></strong> — o envio automático diário dispara este recado
+      pelo WhatsApp na data escolhida.
+    </p>
+    <form method="post" id="form-recado">
+      <div class="form-field">
+        <label for="mensagem_data">Data do envio</label>
+        <input type="date" id="mensagem_data" name="mensagem_data" required />
+      </div>
+      <div class="form-field">
+        <label for="mensagem_texto">Recado</label>
+        <textarea id="mensagem_texto" name="mensagem_texto" rows="4" maxlength="1000" required
+                  placeholder="Ex: Olá, Maria! Lembrando que amanhã é a consulta do Pedro às 14h. 😊"></textarea>
+      </div>
+      <p class="form-hint">
+        O texto vai para o WhatsApp do cliente exatamente como você digitar. Cada boleto guarda
+        um recado por vez; salvar de novo substitui o anterior.
+      </p>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-recado').close()">Fechar</button>
+        <button type="submit" form="form-cancelar-recado" id="btn-remover-recado" class="btn btn-secondary">Remover Agendamento</button>
+        <button type="submit" class="btn btn-primary">Salvar Recado</button>
+      </div>
+    </form>
+    <form method="post" id="form-cancelar-recado"></form>
+  </dialog>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+<script>
+  // Os dados chegam prontos do backend; marcar um boleto como pago recarrega a
+  // página, e cards + gráficos são recalculados na hora.
+  const METRICAS = {{ metricas | tojson }};
+  const HISTORICO = {{ historico | tojson }};
+
+  // ----- Modal do Recado Personalizado (Agendamento de Mensagem Customizada) -----
+  function abrirModalRecado(botao) {
+    const modal = document.getElementById("modal-recado");
+    const id = botao.dataset.boletoId;
+    document.getElementById("recado-cliente").textContent = botao.dataset.cliente;
+    document.getElementById("form-recado").action = `/boletos/${id}/agendar-mensagem`;
+    document.getElementById("form-cancelar-recado").action = `/boletos/${id}/cancelar-mensagem`;
+
+    const campoData = document.getElementById("mensagem_data");
+    campoData.min = new Date().toLocaleDateString("sv-SE"); // hoje no formato YYYY-MM-DD
+    campoData.value = botao.dataset.data;
+    document.getElementById("mensagem_texto").value = botao.dataset.texto;
+    // "Remover Agendamento" só aparece quando o boleto já tem recado marcado.
+    document.getElementById("btn-remover-recado").style.display = botao.dataset.data ? "" : "none";
+    modal.showModal();
+  }
+
+  // Clicar no fundo escurecido fecha o modal, como o botão Fechar.
+  document.getElementById("modal-recado").addEventListener("click", (evento) => {
+    if (evento.target === evento.currentTarget) evento.currentTarget.close();
+  });
+
+  const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+
+  // As cores vêm das variáveis CSS do tema ativo — assim os gráficos se adaptam
+  // sozinhos ao alternar claro/escuro (evento "temaAlterado" do main.js).
+  function coresTema() {
+    const css = getComputedStyle(document.body);
+    const v = nome => css.getPropertyValue(nome).trim();
+    return {
+      recebido: v("--color-success"),
+      aVencer: v("--color-warning"),
+      inadimplente: v("--color-danger"),
+      barra: v("--brand-teal"),
+      grade: v("--chart-grid"),
+      texto: v("--color-text-secondary"),
+      superficie: v("--color-surface"),
+    };
+  }
+
+  let graficos = [];
+
+  function montarGraficos() {
+    graficos.forEach(grafico => grafico.destroy());
+    graficos = [];
+    const CORES = coresTema();
+    Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+    Chart.defaults.color = CORES.texto;
+
+    // ----- Barras: histórico de recebimentos (série única, sem legenda) -----
+    const canvasHistorico = document.getElementById("grafico-historico");
+    if (canvasHistorico) {
+      graficos.push(new Chart(canvasHistorico, {
+        type: "bar",
+        data: {
+          labels: HISTORICO.map(m => m.label),
+          datasets: [{
+            data: HISTORICO.map(m => m.total),
+            backgroundColor: CORES.barra,
+            borderRadius: 4,
+            maxBarThickness: 42,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: { label: ctx => " Recebido: " + BRL.format(ctx.parsed.y) },
+            },
+          },
+          scales: {
+            x: { grid: { display: false }, border: { display: false } },
+            y: {
+              beginAtZero: true,
+              grid: { color: CORES.grade },
+              border: { display: false },
+              ticks: {
+                callback: v => v >= 1000 ? "R$ " + (v / 1000).toLocaleString("pt-BR") + " mil" : BRL.format(v),
+              },
+            },
+          },
+        },
+      }));
+    }
+
+    // ----- Rosca: situação do mês (cores de status, sempre com rótulo) -----
+    const canvasSituacao = document.getElementById("grafico-situacao");
+    if (canvasSituacao) {
+      graficos.push(new Chart(canvasSituacao, {
+        type: "doughnut",
+        data: {
+          labels: ["Recebido", "A vencer", "Inadimplente"],
+          datasets: [{
+            data: [METRICAS.recebido, METRICAS.a_vencer, METRICAS.inadimplente],
+            backgroundColor: [CORES.recebido, CORES.aVencer, CORES.inadimplente],
+            borderColor: CORES.superficie,
+            borderWidth: 2, // respiro entre as fatias
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: "62%",
+          plugins: {
+            legend: {
+              position: "bottom",
+              labels: { usePointStyle: true, pointStyle: "circle", padding: 16 },
+            },
+            tooltip: {
+              callbacks: {
+                label: ctx => {
+                  const pct = METRICAS.previsto > 0
+                    ? (ctx.parsed / METRICAS.previsto * 100).toFixed(1).replace(".", ",")
+                    : "0";
+                  return ` ${ctx.label}: ${BRL.format(ctx.parsed)} (${pct}%)`;
+                },
+              },
+            },
+          },
+        },
+      }));
+    }
+  }
+
+  if (typeof Chart !== "undefined") {
+    montarGraficos();
+    document.addEventListener("temaAlterado", montarGraficos);
+  }
+</script>
+{% endblock %}
